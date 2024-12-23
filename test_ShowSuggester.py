@@ -1,16 +1,68 @@
 import pytest
-from main import get_user_input, validate_tv_shows, generate_recommendations
+import numpy as np
+import os
+from recommender_functionality import load_pickle_file, match_show_names, calculate_average_vector
+from unittest.mock import patch
 
-def test_get_user_input(monkeypatch):
-    # Simulate user input
-    monkeypatch.setattr('builtins.input', lambda _: "game of throns, lupan, witcher")
-    result = get_user_input()
-    assert result == ["game of throns", "lupan", "witcher"]
+# Get the current script directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def test_validate_tv_shows():
-    user_input = ["game of throns", "lupan", "witcher"]
-    valid_shows = validate_tv_shows(user_input)
-    assert valid_shows == ["Game Of Thrones", "Lupin", "The Witcher"]
+# Construct the relative path to the embeddings file
+EMBEDDINGS_FILE = os.path.join(BASE_DIR, "embedded _shows.pkl")
+
+
+
+
+def test_match_show_names():
+    available_shows = [
+        "Game Of Thrones",
+        "Lupin",
+        "The Witcher",
+        "Breaking Bad",
+        "Sherlock",
+        "Dark"
+    ]
+    user_input = ["gem of throns", "lupan", "witcher"]
+    valid_shows = match_show_names(user_input, available_shows=available_shows)
+
+    # Expected result: tuples of matched show names with confidence scores
+    expected_shows = [
+        ('Game Of Thrones', 86),
+        ('Lupin', 80),
+        ('The Witcher', 90)
+    ]
+@patch("recommender_functionality.load_pickle_file")  
+def test_calculate_average_vector(mock_load_pickle_file):
+    # Mock data: Embedding dictionary
+    mock_embeddings = {
+        "Game Of Thrones": [0.1, 0.2, 0.3],
+        "Lupin": [0.4, 0.5, 0.6],
+        "The Witcher": [0.7, 0.8, 0.9]
+    }
+
+    # Mock return value for load_pickle_file
+    mock_load_pickle_file.return_value = mock_embeddings
+
+    # Test input: Shows user liked
+    matched_shows = ["Game Of Thrones", "Lupin", "The Witcher"]
+
+    # Expected output
+    expected_average = np.mean(
+        [mock_embeddings["Game Of Thrones"], mock_embeddings["Lupin"], mock_embeddings["The Witcher"]],
+        axis=0
+    )
+
+    # Call the function
+    calculated_average = calculate_average_vector(matched_shows)
+
+    # Assert the calculated average matches the expected average
+    assert np.allclose(calculated_average, expected_average), (
+        f"Expected {expected_average}, but got {calculated_average}"
+    )
+
+def test_fetch_data_from_dictionary():
+    data = load_pickle_file(EMBEDDINGS_FILE)
+    assert (list(data.keys())[0]).lower()   == "game of thrones"
 
 def test_generate_recommendations():
     valid_shows = ["Game Of Thrones", "Lupin", "The Witcher"]
