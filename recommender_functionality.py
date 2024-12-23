@@ -124,3 +124,35 @@ def get_top_n_closest_shows(distances, show_titles, top_n=5):
 
     return closest_shows
 
+def calculate_percentages(top_shows):
+    """
+    Convert distances into percentages for each show.
+
+    :param top_shows: List of tuples (TV show title, distance)
+    :return: List of tuples (TV show title, percentage score)
+    """
+    distances = [dist for _, dist in top_shows]
+    min_distance = min(distances)
+    max_distance = max(distances)
+
+    percentages = [
+        (show, 100 * (1 - (dist - min_distance) / (max_distance - min_distance)))
+        if max_distance != min_distance else (show, 100)  # Handle edge case where all distances are equal
+        for show, dist in top_shows
+    ]
+
+    # Sort by percentage in descending order
+    percentages.sort(key=lambda x: x[1], reverse=True)
+
+    return percentages
+
+
+def display_recommendations(percentages):
+    """
+    Format and display recommendations.
+
+    :param percentages: List of tuples (TV show title, percentage score)
+    """
+    print("Top Recommendations:")
+    for show, score in percentages:
+        print(f"{show} ({int(score)}%)")

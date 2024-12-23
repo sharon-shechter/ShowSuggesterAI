@@ -3,7 +3,7 @@ import numpy as np
 from unittest.mock import patch
 from scipy.spatial import distance
 import os
-from recommender_functionality import load_pickle_file, match_show_names, calculate_average_vector, distances_from_avg_vector,get_top_n_closest_shows
+from recommender_functionality import load_pickle_file, match_show_names, calculate_average_vector, distances_from_avg_vector,get_top_n_closest_shows, display_recommendations
 
 # Get the current script directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -109,9 +109,46 @@ def test_top5_closest_shows():
     # Assert the top 5 closest shows match the expected result
     assert top5 == expected_top5
 
+
+
+def test_display_recommendations(capsys):
+    # Input: List of shows with percentages
+    percentages = [
+        ("Breaking Bad", 99.0),
+        ("Sherlock", 85.0),
+        ("Dark", 81.0),
+        ("Lupin", 75.0),
+        ("The Witcher", 70.0)
+    ]
+
+    # Call the function to display recommendations
+    display_recommendations(percentages)
+
+    # Capture the printed output
+    captured = capsys.readouterr()
+
+    # Expected output
+    expected_output = (
+        "Top Recommendations:\n"
+        "Breaking Bad (99%)\n"
+        "Sherlock (85%)\n"
+        "Dark (81%)\n"
+        "Lupin (75%)\n"
+        "The Witcher (70%)\n"
+    )
+
+    # Assert the captured output matches the expected output
+    assert captured.out == expected_output
+
+
+
 def test_fetch_data_from_dictionary():
     data = load_pickle_file(EMBEDDINGS_FILE)
-    assert (list(data.keys())[0]).lower()   == "game of thrones"
+    assert "Game Of Thrones" in data
+
+
+
+
 
 def test_generate_recommendations():
     valid_shows = ["Game Of Thrones", "Lupin", "The Witcher"]
