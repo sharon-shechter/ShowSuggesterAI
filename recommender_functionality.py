@@ -103,3 +103,24 @@ def distances_from_avg_vector(average_vector, distance_metric="cosine"):
     distances = [metric_function(average_vector, embedding) for embedding in embeddings]
     return distances
 
+
+def get_top_n_closest_shows(distances, show_titles, top_n=5):
+    """
+    Get the top N TV shows closest to the average vector.
+
+    :param distances: List of distances between the average vector and all TV show embeddings
+    :param show_titles: List of TV show titles corresponding to the embeddings
+    :param top_n: Number of closest shows to return (default is 5)
+    :return: List of tuples (TV show title, distance) for the top N closest shows
+    """
+    if len(distances) != len(show_titles):
+        raise ValueError("The number of distances must match the number of show titles.")
+
+    # Get indices of the smallest distances
+    closest_indices = np.argsort(distances)[:top_n]
+
+    # Get the corresponding show titles and distances
+    closest_shows = [(show_titles[i], distances[i]) for i in closest_indices]
+
+    return closest_shows
+

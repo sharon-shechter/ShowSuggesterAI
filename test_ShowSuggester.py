@@ -3,7 +3,7 @@ import numpy as np
 from unittest.mock import patch
 from scipy.spatial import distance
 import os
-from recommender_functionality import load_pickle_file, match_show_names, calculate_average_vector, distances_from_avg_vector
+from recommender_functionality import load_pickle_file, match_show_names, calculate_average_vector, distances_from_avg_vector,get_top_n_closest_shows
 
 # Get the current script directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,7 +32,7 @@ def test_match_show_names():
         ('Lupin', 80),
         ('The Witcher', 90)
     ]
-@patch("recommender_functionality.load_pickle_file")  
+@patch("recommender_functionality.load_pickle_file")
 def test_calculate_average_vector(mock_load_pickle_file):
     # Mock data: Embedding dictionary
     mock_embeddings = {
@@ -62,8 +62,7 @@ def test_calculate_average_vector(mock_load_pickle_file):
     )
 
 
-
-@patch("recommender_functionality.load_pickle_file")  
+@patch("recommender_functionality.load_pickle_file")
 def test_distances_from_avg_vector(mock_load_pickle_file):
     # Mock embeddings dictionary
     mock_embeddings = {
@@ -88,6 +87,27 @@ def test_distances_from_avg_vector(mock_load_pickle_file):
     assert np.allclose(calculated_distances, expected_distances), (
         f"Expected distances: {expected_distances}, but got: {calculated_distances}"
     )
+
+
+def test_top5_closest_shows():
+    distances = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    show_titles =["Game Of Thrones", "Breaking Bad", "Sherlock" , "Dark", "Lupin", "The Witcher"]
+    
+
+    # Expected top 5 closest shows
+    expected_top5 = [
+        ("Game Of Thrones", 0.1),
+        ("Breaking Bad", 0.2),
+        ("Sherlock", 0.3),
+        ("Dark", 0.4),
+        ("Lupin", 0.5),
+    ]
+
+    # Call the function
+    top5 = get_top_n_closest_shows(distances, show_titles, 5)
+
+    # Assert the top 5 closest shows match the expected result
+    assert top5 == expected_top5
 
 def test_fetch_data_from_dictionary():
     data = load_pickle_file(EMBEDDINGS_FILE)
