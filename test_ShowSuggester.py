@@ -1,8 +1,9 @@
 import pytest
 import numpy as np
-import os
-from recommender_functionality import load_pickle_file, match_show_names, calculate_average_vector
 from unittest.mock import patch
+from scipy.spatial import distance
+import os
+from recommender_functionality import load_pickle_file, match_show_names, calculate_average_vector, distances_from_avg_vector
 
 # Get the current script directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -58,6 +59,34 @@ def test_calculate_average_vector(mock_load_pickle_file):
     # Assert the calculated average matches the expected average
     assert np.allclose(calculated_average, expected_average), (
         f"Expected {expected_average}, but got {calculated_average}"
+    )
+
+
+
+@patch("recommender_functionality.load_pickle_file")  
+def test_distances_from_avg_vector(mock_load_pickle_file):
+    # Mock embeddings dictionary
+    mock_embeddings = {
+        "Game Of Thrones": [0.1, 0.2, 0.3],
+        "Breaking Bad": [0.4, 0.5, 0.6],
+        "Sherlock": [0.7, 0.8, 0.9]
+    }
+    mock_load_pickle_file.return_value = mock_embeddings
+
+    # Define test inputs
+    average_vector = [0.4, 0.5, 0.6]
+    expected_distances = [
+        distance.cosine(average_vector, mock_embeddings["Game Of Thrones"]),
+        distance.cosine(average_vector, mock_embeddings["Breaking Bad"]),
+        distance.cosine(average_vector, mock_embeddings["Sherlock"])
+    ]
+
+    # Call the function
+    calculated_distances = distances_from_avg_vector(average_vector, distance_metric="cosine")
+
+    # Assert distances match expected values
+    assert np.allclose(calculated_distances, expected_distances), (
+        f"Expected distances: {expected_distances}, but got: {calculated_distances}"
     )
 
 def test_fetch_data_from_dictionary():
