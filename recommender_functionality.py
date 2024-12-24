@@ -3,10 +3,11 @@ import pickle
 import os
 import numpy as np
 import requests
-import time
+import tkinter as tk
+from PIL import Image, ImageTk
+from io import BytesIO
 from scipy.spatial import distance
-from apiKeys import LIGHTX_API_KEY
-
+import time 
 
 
 
@@ -167,7 +168,8 @@ def display_recommendations(percentages):
 
 
 
-API_KEY = LIGHTX_API_KEY  
+# Replace with your LightX API Key
+LIGHTX_API_KEY = "a541fbadf6c94ba9866c9dbe41fa6f9c_5c3a55cfeff54141927e98f3a8552550_andoraitools"
 BASE_URL = "https://api.lightxeditor.com/external/api/v1"
 
 def generate_image(prompt):
@@ -179,7 +181,7 @@ def generate_image(prompt):
     url = f"{BASE_URL}/text2image"
     headers = {
         "Content-Type": "application/json",
-        "x-api-key": API_KEY
+        "x-api-key": LIGHTX_API_KEY
     }
     data = {
         "textPrompt": prompt
@@ -202,7 +204,7 @@ def check_status(order_id):
     url = f"{BASE_URL}/order-status"
     headers = {
         "Content-Type": "application/json",
-        "x-api-key": API_KEY
+        "x-api-key": LIGHTX_API_KEY
     }
     payload = {
         "orderId": order_id
@@ -224,3 +226,31 @@ def check_status(order_id):
     print("Image generation timed out.")
     return None
 
+def show_image_in_tkinter(image_url):
+    """
+    Display an image inside a Tkinter window.
+    :param image_url: The URL of the image to display.
+    """
+    # Fetch the image from the URL
+    response = requests.get(image_url)
+    if response.status_code == 200:
+        img_data = BytesIO(response.content)
+        img = Image.open(img_data)
+
+        # Create a Tkinter window
+        window = tk.Tk()
+        window.title("Generated Image")
+
+        # Resize the image to fit in the window
+        img = img.resize((500, 500))  # Resize the image as needed
+        img_tk = ImageTk.PhotoImage(img)
+
+        # Add the image to the Tkinter window
+        label = tk.Label(window, image=img_tk)
+        label.image = img_tk  # Keep a reference to avoid garbage collection
+        label.pack()
+
+        # Run the Tkinter event loop
+        window.mainloop()
+    else:
+        print(f"Failed to fetch image. Status code: {response.status_code}")
