@@ -1,9 +1,11 @@
 from thefuzz import process
-from apiKeys import OPEN_AI_API_KEY
 import pickle
 import os
 import numpy as np
+import requests
+import time
 from scipy.spatial import distance
+from apiKeys import LIGHTX_API_KEY
 
 
 
@@ -156,3 +158,69 @@ def display_recommendations(percentages):
     print("Top Recommendations:")
     for show, score in percentages:
         print(f"{show} ({int(score)}%)")
+
+
+
+#######################
+# image generation code
+#######################
+
+
+
+API_KEY = LIGHTX_API_KEY  
+BASE_URL = "https://api.lightxeditor.com/external/api/v1"
+
+def generate_image(prompt):
+    """
+    Generate an image using the LightX AI API.
+    :param prompt: The text prompt for the image.
+    :return: The orderId for the image generation request.
+    """
+    url = f"{BASE_URL}/text2image"
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY
+    }
+    data = {
+        "textPrompt": prompt
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        print(f"Image generation request successful for prompt: {prompt}")
+        return response.json()["body"]["orderId"]
+    else:
+        print(f"Failed to generate image. Status code: {response.status_code}")
+        print(response.text)
+        return None
+
+def check_status(order_id):
+    """
+    Check the status of the image generation.
+    :param order_id: The order ID of the image generation request.
+    :return: The output URL if the image is ready, otherwise None.
+    """
+    url = f"{BASE_URL}/order-status"
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY
+    }
+    payload = {
+        "orderId": order_id
+    }
+    retries = 5
+    for attempt in range(retries):
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            body = response.json()["body"]
+            if body["status"] == "active":
+                return body["output"]
+            elif body["status"] == "failed":
+                print(f"Image generation failed for order ID: {order_id}")
+                return None
+        else:
+            print(f"Failed to check status. Status code: {response.status_code}")
+            print(response.text)
+        time.sleep(3)  # Wait 3 seconds before retrying
+    print("Image generation timed out.")
+    return None
+
