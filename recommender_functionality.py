@@ -6,8 +6,13 @@ import requests
 import tkinter as tk
 from PIL import Image, ImageTk
 from io import BytesIO
-from scipy.spatial import distance
 import time 
+from tkinter import Tk, Label
+from usearch.index import Index
+import openai
+from PIL import Image, ImageTk
+from io import BytesIO
+from apiKeys import OPEN_AI_API_KEY , LIGHTX_API_KEY
 
 
 
@@ -81,73 +86,113 @@ def calculate_average_vector(matched_shows):
         return None
 
 
-def distances_from_avg_vector(average_vector, distance_metric="cosine"):
+# Initialize the usearch index
+index = Index(
+    ndim=300,  # Set this to match the dimensionality of your embeddings
+    metric="cos",  # Use cosine similarity
+    dtype="f32"    # Floating-point precision
+)
+
+def load_embeddings_to_index(embeddings_file):
     """
-    Return the distances between an average embedding and all embeddings.
+    Load embeddings from a pickle file and populate the usearch index.
 
-    :param average_vector: The embedding to compare (average vector)
-    :param distance_metric: The distance metric to use (default is cosine)
-    :return: List of distances
+    :param embeddings_file: Path to the pickle file containing embeddings
     """
-    distance_metrics = {
-        "cosine": distance.cosine,
-        "L1": distance.cityblock,
-        "L2": distance.euclidean,
-        "Linf": distance.chebyshev,
-    }
+    embeddings = load_pickle_file(embeddings_file)
+    show_titles = list(embeddings.keys())
+    vectors = np.array(list(embeddings.values()), dtype=np.float32)
 
-    # Load all embeddings from the pickle file
-    embeddings = list(load_pickle_file(EMBEDDINGS_FILE).values())
+    # Add embeddings to the index
+    keys = np.arange(len(show_titles))  # Unique integer keys for each show
+    index.add(keys, vectors)
+    return show_titles
 
-    # Select the distance metric function
-    metric_function = distance_metrics.get(distance_metric, distance.cosine)
-
-    # Compute distances
-    distances = [metric_function(average_vector, embedding) for embedding in embeddings]
-    return distances
-
-
-def get_top_n_closest_shows(distances, show_titles, top_n=5):
+# Initialize the usearch index dynamically
+def initialize_usearch_index(embeddings):
     """
-    Get the top N TV shows closest to the average vector.
+    Initializes the usearch index based on the dimensions of the embeddings.
+    :param embeddings: Dictionary of TV show embeddings
+    :return: Initialized usearch Index
+    """
+    sample_vector = next(iter(embeddings.values()))
+    dim = len(sample_vector)
+    index = Index(
+        ndim=dim,  # Use the dimension of the embeddings
+        metric="cos",  # Cosine similarity
+        dtype="f32"    # Floating-point precision
+    )
+    return index
 
-    :param distances: List of distances between the average vector and all TV show embeddings
+def load_embeddings_to_index(embeddings_file, index):
+    """
+    Load embeddings from a pickle file and populate the usearch index.
+
+    :param embeddings_file: Path to the pickle file containing embeddings
+    :param index: Usearch index object
+    """
+    embeddings = load_pickle_file(embeddings_file)
+    show_titles = list(embeddings.keys())
+    vectors = np.array(list(embeddings.values()), dtype=np.float32)
+
+    # Batch add embeddings to the index
+    keys = np.arange(len(show_titles))  # Unique integer keys for each show
+    index.add(keys, vectors)
+    return show_titles
+
+def get_top_n_closest_shows_with_usearch(average_vector, show_titles, index, user_shows, top_n=5):
+    """
+    Get the top N TV shows closest to the average vector using the usearch index.
+
+    :param average_vector: The average vector computed from matched shows
     :param show_titles: List of TV show titles corresponding to the embeddings
+    :param index: Usearch index object
+    :param user_shows: List of user's input shows to exclude from recommendations
     :param top_n: Number of closest shows to return (default is 5)
     :return: List of tuples (TV show title, distance) for the top N closest shows
     """
-    if len(distances) != len(show_titles):
-        raise ValueError("The number of distances must match the number of show titles.")
+    # Perform the search
+    matches = index.search(average_vector, top_n + len(user_shows))  # Fetch extra matches
 
-    # Get indices of the smallest distances
-    closest_indices = np.argsort(distances)[:top_n]
+    # Retrieve the show titles and distances, excluding user's input shows
+    closest_shows = [
+        (show_titles[match.key], match.distance)
+        for match in matches
+        if show_titles[match.key] not in user_shows
+    ]
 
-    # Get the corresponding show titles and distances
-    closest_shows = [(show_titles[i], distances[i]) for i in closest_indices]
+    # Return the top N closest shows
+    return closest_shows[:top_n]
 
-    return closest_shows
-
-def calculate_percentages(top_shows):
+def calculate_percentages(top_shows, threshold=10):
     """
-    Convert distances into percentages for each show.
+    Convert distances into percentages for each show and filter recommendations.
 
     :param top_shows: List of tuples (TV show title, distance)
-    :return: List of tuples (TV show title, percentage score)
+    :param threshold: Minimum percentage threshold to include a recommendation (default is 10%)
+    :return: Filtered list of tuples (TV show title, percentage score)
     """
+    if not top_shows:
+        return []
+
     distances = [dist for _, dist in top_shows]
     min_distance = min(distances)
     max_distance = max(distances)
 
+    # Ensure meaningful scaling of percentages
     percentages = [
         (show, 100 * (1 - (dist - min_distance) / (max_distance - min_distance)))
         if max_distance != min_distance else (show, 100)  # Handle edge case where all distances are equal
         for show, dist in top_shows
     ]
 
-    # Sort by percentage in descending order
-    percentages.sort(key=lambda x: x[1], reverse=True)
+    # Apply threshold to filter out very low scores
+    filtered_percentages = [(show, round(score)) for show, score in percentages if score >= threshold]
 
-    return percentages
+    # Sort by percentage in descending order
+    filtered_percentages.sort(key=lambda x: x[1], reverse=True)
+
+    return filtered_percentages
 
 
 def display_recommendations(percentages):
@@ -161,6 +206,43 @@ def display_recommendations(percentages):
         print(f"{show} ({int(score)}%)")
 
 
+def get_inspired_for_one_show(tv_shows):
+    """
+    Generate a unique TV show idea based on a list of existing TV shows.
+    """
+    openai.api_key = OPEN_AI_API_KEY
+
+    # Prepare the prompt for the OpenAI API
+    prompt = (
+        "Here is a list of TV shows: \n"
+        f"{', '.join(tv_shows)}\n"
+        "Based on these shows, create a unique and creative TV show idea. "
+        "Provide the title and a brief description show."
+        "DO like this format:"
+        "Roommate Roulette (NO BOLD) -When a quirky group of mismatched roommates in a co-living space..."
+    )
+
+    try:
+        # Make the API call
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",  # Using the 4.0 mini model
+            messages=[
+                {"role": "system", "content": "You are a creative TV show writer."},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=300,
+            temperature=0.7
+        )
+
+        # Extract the response text
+        result = response['choices'][0]['message']['content'].strip()
+        return result
+
+    except Exception as e:
+        print(f"Error generating TV shows: {e}")
+        return None
+    
+
 
 #######################
 # image generation code
@@ -169,14 +251,13 @@ def display_recommendations(percentages):
 
 
 # Replace with your LightX API Key
-LIGHTX_API_KEY = "a541fbadf6c94ba9866c9dbe41fa6f9c_5c3a55cfeff54141927e98f3a8552550_andoraitools"
 BASE_URL = "https://api.lightxeditor.com/external/api/v1"
 
 def generate_image(prompt):
     """
     Generate an image using the LightX AI API.
     :param prompt: The text prompt for the image.
-    :return: The orderId for the image generation request.
+    :return: The orderId for the image generation request, or None if it fails.
     """
     url = f"{BASE_URL}/text2image"
     headers = {
@@ -186,13 +267,22 @@ def generate_image(prompt):
     data = {
         "textPrompt": prompt
     }
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        print(f"Image generation request successful for prompt: {prompt}")
-        return response.json()["body"]["orderId"]
-    else:
-        print(f"Failed to generate image. Status code: {response.status_code}")
-        print(response.text)
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            response_json = response.json()
+            if response_json and "body" in response_json and "orderId" in response_json["body"]:
+                print(f"Image generation request successful for prompt: {prompt}")
+                return response_json["body"]["orderId"]
+            else:
+                print(f"Unexpected response format or missing 'orderId': {response_json}")
+                return None
+        else:
+            print(f"Failed to generate image. Status code: {response.status_code}")
+            print(response.text)
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"Error while making the API request: {e}")
         return None
 
 def check_status(order_id):
@@ -231,26 +321,53 @@ def show_image_in_tkinter(image_url):
     Display an image inside a Tkinter window.
     :param image_url: The URL of the image to display.
     """
-    # Fetch the image from the URL
-    response = requests.get(image_url)
-    if response.status_code == 200:
-        img_data = BytesIO(response.content)
-        img = Image.open(img_data)
+    try:
+        # Fetch the image from the URL
+        response = requests.get(image_url)
+        if response.status_code == 200:
+            img_data = BytesIO(response.content)
+            img = Image.open(img_data)
 
-        # Create a Tkinter window
-        window = tk.Tk()
-        window.title("Generated Image")
+            # Create a Tkinter window
+            window = tk.Tk()
+            window.title("Generated Image")
 
-        # Resize the image to fit in the window
-        img = img.resize((500, 500))  # Resize the image as needed
-        img_tk = ImageTk.PhotoImage(img)
+            # Resize the image to fit in the window
+            img = img.resize((500, 500), Image.LANCZOS)  # Updated resizing method
+            img_tk = ImageTk.PhotoImage(img)
 
-        # Add the image to the Tkinter window
-        label = tk.Label(window, image=img_tk)
-        label.image = img_tk  # Keep a reference to avoid garbage collection
-        label.pack()
+            # Add the image to the Tkinter window
+            label = tk.Label(window, image=img_tk)
+            label.image = img_tk  # Keep a reference to avoid garbage collection
+            label.pack()
 
-        # Run the Tkinter event loop
-        window.mainloop()
+            # Run the Tkinter event loop
+            window.mainloop()
+        else:
+            print(f"Failed to fetch image. Status code: {response.status_code}")
+    except Exception as e:
+        print(f"Error displaying the image: {e}")
+
+
+def image_generation_from_prompt(prompt):
+    """
+    Generate an image and display it inside the Python program.
+    :param prompt: The prompt for generating the image.
+    """
+    # Generate image
+    order_id = generate_image(prompt)
+    
+    if order_id:
+        print(f"Order ID: {order_id}")
+        
+        # Check status and get image URL
+        image_url = check_status(order_id)
+        
+        if image_url:
+            print(f"Image URL: {image_url}")
+            # Show the image inside the Python program
+            show_image_in_tkinter(image_url)
+        else:
+            print("Failed to retrieve the image URL.")
     else:
-        print(f"Failed to fetch image. Status code: {response.status_code}")
+        print("Image generation failed.")
