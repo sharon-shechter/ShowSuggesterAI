@@ -12,8 +12,7 @@ This project implements a video search engine that allows users to search for sp
 - **Collage Generation:** Displays and saves a collage of matching scene images.
 - **Video-Based Search:** Optionally uses Google Gemini's video understanding model for broader queries.
 
-
-### Workflow
+## Workflow
 1. **Downloading a Video**
    - The program will search YouTube for "Super Mario Movie Trailer" and download it using `yt-dlp`.
    - If the video is already downloaded, this step will be skipped.
@@ -45,7 +44,6 @@ This project implements a video search engine that allows users to search for sp
   - Extracted scene images in a folder.
   - `scene_captions.json` with captions mapped to scenes.
   - `collage.png` showing scenes matching the search query.
-
 
 ## Notes
 - Ensure your OpenAI/Gemini API key is set up if using the video search option.
