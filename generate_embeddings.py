@@ -2,9 +2,9 @@ import openai
 import pandas as pd
 import pickle
 
-# Path to your CSV file
-CSV_FILE = r"C:\Users\sharon shechter\Desktop\school\Third year\Dudu\2\ShowSuggesterAI\imdb_tvshows - imdb_tvshows.csv"
-PICKLE_FILE = r"C:\Users\sharon shechter\Desktop\school\Third year\Dudu\2\ShowSuggesterAI\embeddings.pkl"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  
+CSV_FILE = os.path.join(BASE_DIR, "imdb_tvshows.csv")  
+PICKLE_FILE = os.path.join(BASE_DIR, "embeddings.pkl")  
 
 def load_tv_shows(csv_file):
     """
@@ -66,14 +66,12 @@ def generate_embeddings(api_key, shows_df, pickle_file):
     
 
 if __name__ == "__main__":
-    # Load shows from CSV
     tv_shows = load_tv_shows(CSV_FILE)
 
     # Ensure the required columns are present
     if "Title" not in tv_shows.columns or "Description" not in tv_shows.columns:
         raise ValueError("CSV file must contain 'Title' and 'Description' columns.")
 
-    # Your OpenAI API key
 
 
     # Generate embeddings
