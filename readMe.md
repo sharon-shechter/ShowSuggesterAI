@@ -3,6 +3,13 @@
 ## Overview
 This project implements a video search engine that allows users to search for specific content inside a video using captions generated from scenes. The project leverages AI tools and libraries to break down a video into scenes, generate textual descriptions, and enable efficient search functionality.
 
+
+
+## Video - 
+[Watch the demo video](https://drive.google.com/file/d/1rpg4m3sKiCXhRhL3IL9Le6X8LxyKYpx2/view?usp=sharing)
+
+
+
 ## Features
 - **Download Video:** Uses `yt-dlp` to download a video from YouTube based on a search query.
 - **Scene Detection:** Uses `pyscenedetect` to split the video into different scenes.
